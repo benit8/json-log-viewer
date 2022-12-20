@@ -46,9 +46,12 @@ impl<'a> App<'a> {
 				if let Event::Key(key) = event::read()? {
 					match key.code {
 						KeyCode::Char('q') => return Ok(()),
-						KeyCode::Left => self.events.unselect(),
-						KeyCode::Down => self.events.select_next(),
-						KeyCode::Up => self.events.select_previous(),
+						KeyCode::Down => self.events.select_n_down(1),
+						KeyCode::End => self.events.select_last(),
+						KeyCode::Home => self.events.select_first(),
+						KeyCode::PageDown => self.events.select_n_down(terminal.size()?.height as usize),
+						KeyCode::PageUp => self.events.select_n_up(terminal.size()?.height as usize),
+						KeyCode::Up => self.events.select_n_up(1),
 						_ => {}
 					}
 				}
