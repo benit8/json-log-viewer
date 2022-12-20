@@ -3,7 +3,7 @@ mod stateful_list;
 
 use async_std::{
 	channel,
-	io::{BufReader, Error, Read, stdin},
+	io::{BufReader, Error, /*Read, stdin*/},
 	fs::File,
 	prelude::*,
 	task,

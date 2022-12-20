@@ -1,20 +1,16 @@
-use tui::widgets::ListState;
+use tui::widgets::{ListItem, ListState};
 
-pub struct StatefulList<T> {
+pub struct StatefulList<'a> {
 	state: ListState,
-	items: Vec<T>,
+	items: Vec<ListItem<'a>>,
 }
 
-impl<T> StatefulList<T> {
-	pub fn with_items(items: Vec<T>) -> StatefulList<T> {
-		let mut list = StatefulList {
+impl<'a> StatefulList<'a> {
+	pub fn new() -> StatefulList<'a> {
+		StatefulList {
 			state: ListState::default(),
-			items,
-		};
-		if list.items.len() > 0 {
-			list.state.select(Some(0));
+			items: vec!(),
 		}
-		list
 	}
 
 	pub fn state(&self) -> &ListState {
@@ -25,11 +21,11 @@ impl<T> StatefulList<T> {
 		&mut self.state
 	}
 
-	pub fn items(&self) -> &Vec<T> {
+	pub fn items(&self) -> &Vec<ListItem> {
 		&self.items
 	}
 
-	pub fn add(&mut self, item: T) {
+	pub fn push_item(&mut self, item: ListItem<'a>) {
 		self.items.push(item);
 
 		if self.items.len() == 1 {
