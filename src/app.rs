@@ -22,7 +22,7 @@ use tui::{
 pub struct App<'a> {
 	input_filename: String,
 	log_receiver: &'a Receiver<Map<String, Value>>,
-	events: StatefulList<Map<String, Value>>,
+	list: StatefulList<Map<String, Value>>,
 }
 
 impl<'a> App<'a> {
@@ -30,7 +30,7 @@ impl<'a> App<'a> {
 		App {
 			input_filename: input,
 			log_receiver: receiver,
-			events: StatefulList::with_items(vec![]),
+			list: StatefulList::with_items(vec![]),
 		}
 	}
 
@@ -41,17 +41,17 @@ impl<'a> App<'a> {
 
 			let timeout = tick_rate
 				.checked_sub(last_tick.elapsed())
-				.unwrap_or_else(|| Duration::from_secs(0));
+				.unwrap_or(Duration::from_secs(0));
 			if crossterm::event::poll(timeout)? {
 				if let Event::Key(key) = event::read()? {
 					match key.code {
 						KeyCode::Char('q') => return Ok(()),
-						KeyCode::Down => self.events.select_n_down(1),
-						KeyCode::End => self.events.select_last(),
-						KeyCode::Home => self.events.select_first(),
-						KeyCode::PageDown => self.events.select_n_down(terminal.size()?.height as usize),
-						KeyCode::PageUp => self.events.select_n_up(terminal.size()?.height as usize),
-						KeyCode::Up => self.events.select_n_up(1),
+						KeyCode::Down => self.list.select_n_down(1),
+						KeyCode::End => self.list.select_last(),
+						KeyCode::Home => self.list.select_first(),
+						KeyCode::PageDown => self.list.select_n_down(terminal.size()?.height as usize),
+						KeyCode::PageUp => self.list.select_n_up(terminal.size()?.height as usize),
+						KeyCode::Up => self.list.select_n_up(1),
 						_ => {}
 					}
 				}
@@ -67,7 +67,7 @@ impl<'a> App<'a> {
 	fn on_tick(&mut self) -> Result<(), TryRecvError> {
 		loop {
 			match self.log_receiver.try_recv() {
-				Ok(log) => self.events.add(log),
+				Ok(log) => self.list.add(log),
 				Err(_) => break,
 			}
 		}
@@ -76,16 +76,18 @@ impl<'a> App<'a> {
 	}
 
 	fn ui<B: Backend>(&mut self, f: &mut Frame<B>) {
-		let items: Vec<ListItem> = self.events
+		let items: Vec<ListItem> = self.list
 			.items()
 			.iter()
 			.map(|log| {
 				let level_name = log["level_name"].as_str().unwrap_or("[NONE]");
 				let datetime = log["datetime"].as_str().unwrap_or("--------------------------------");
 				let message = log["message"].as_str().unwrap_or_default();
+				// FIXME: assign an empty map
+				let context = log["context"].as_object().unwrap();
 
 				// Colorcode the level depending on its type
-				let s = match level_name {
+				let level_style = match level_name {
 					"DEBUG" => Style::default().fg(Color::Magenta),
 					"INFO" => Style::default().fg(Color::Blue),
 					"NOTICE" => Style::default().fg(Color::Cyan),
@@ -94,22 +96,36 @@ impl<'a> App<'a> {
 					_ => Style::default(),
 				};
 
+				let flattened_context = context.iter()
+					.map(|(k, v)| format!("{} = {}", k, v.to_string()))
+					.collect::<Vec<String>>()
+					.join(", ");
+
 				ListItem::new(Spans::from(vec![
 					Span::raw(datetime.to_string()),
 					Span::raw(" "),
-					Span::styled(format!("{:<9}", level_name), s),
+					Span::styled(format!("{:<9}", level_name), level_style),
 					Span::raw(" "),
-					Span::raw(message.to_string()),
+					Span::raw(format!("{:<32}", message)),
+					Span::raw(" "),
+					Span::styled(flattened_context, Style::default().fg(Color::Gray)),
 				]))
 			})
 			.collect();
 
 		// Create a List from all list items and highlight the currently selected one
 		let list = List::new(items)
-			.block(Block::default().borders(Borders::ALL).title(format!(" [ {} ] ", self.input_filename)))
+			.block(Block::default()
+				.borders(Borders::ALL)
+				.title(format!(" [ {} ] [ {} / {} ] ",
+					self.input_filename,
+					self.list.state().selected().unwrap_or(0) + 1,
+					self.list.items().len()
+				))
+			)
 			.highlight_style(Style::default().bg(Color::White).fg(Color::Black));
 
 		// We can now render the item list
-		f.render_stateful_widget(list, f.size(), self.events.state_mut());
+		f.render_stateful_widget(list, f.size(), self.list.state_mut());
 	}
 }

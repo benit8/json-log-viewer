@@ -17,6 +17,10 @@ impl<T> StatefulList<T> {
 		list
 	}
 
+	pub fn state(&self) -> &ListState {
+		&self.state
+	}
+
 	pub fn state_mut(&mut self) -> &mut ListState {
 		&mut self.state
 	}
@@ -67,9 +71,5 @@ impl<T> StatefulList<T> {
 
 	pub fn select_last(&mut self) {
 		self.state.select(Some(self.items.len() - 1));
-	}
-
-	pub fn unselect(&mut self) {
-		self.state.select(None);
 	}
 }
